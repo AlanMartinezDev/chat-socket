@@ -10,21 +10,24 @@ app.use(express.static("public"));
 const io = new Server(httpServer, {});
 
 io.on("connection", (socket) => {
-  
-    console.log('Connectat un client...');
-
     let nickname = "";
+    let lastMessageTime = 0;
 
     socket.on("nickname", function(data) {
-        console.log(data.nickname);
         nickname = data.nickname;
-        socket.emit("nickname rebut",{"response":"ok"});
+        socket.emit("nickname received");
     });
 
     socket.on("chat message", function(data) {
-        io.emit("chat message", {nickname, message: data.message});
-    });
+        const currentTime = new Date().getTime();
 
+        if (currentTime - lastMessageTime >= 10000) {
+            io.emit("chat message", {nickname, message: data.message});
+            lastMessageTime = currentTime;
+        } else {
+            socket.emit("timeout message");
+        }
+    });
 });
 
 httpServer.listen(3000, ()=>

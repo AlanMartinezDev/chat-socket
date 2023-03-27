@@ -1,20 +1,14 @@
 const socket = io();
 
 const nicknameInput = document.getElementById("nicknameInput");
-const sendButton = document.getElementById("sendButton");
 const messages = document.getElementById("messages");
 const messageForm = document.getElementById("messageForm");
 const messageInput = document.getElementById("messageInput");
 const nicknameForm = document.getElementById("nicknameForm");
 
-sendButton.addEventListener("click", (e) => {
-    e.preventDefault();
-    send();
-});
-
 nicknameForm.addEventListener("submit", (e) => {
     e.preventDefault();
-    send();
+    sendNickname();
 });
 
 messageForm.addEventListener("submit", (e) => {
@@ -22,19 +16,37 @@ messageForm.addEventListener("submit", (e) => {
     sendMessage();
 });
 
-function send() {
+function sendNickname() {
     const nickname = nicknameInput.value;
     if (nickname) {
         socket.emit("nickname", { nickname });
     }
 }
 
+let lastMessageTime = 0;
+
 function sendMessage() {
     const message = messageInput.value;
-    if (message) {
+    const currentTime = new Date().getTime();
+
+    if (message && currentTime - lastMessageTime >= 10000) {
         socket.emit("chat message", { message });
         messageInput.value = "";
+        lastMessageTime = currentTime;
+    } else {
+        showMessage("Debes esperar 10 segundos entre cada mensaje.", "text-danger");
     }
+}
+
+function loadChatHistory() {
+    const chatHistory = localStorage.getItem("chatHistory");
+    if (chatHistory) {
+        messages.innerHTML = chatHistory;
+    }
+}
+
+function saveChatHistory() {
+    localStorage.setItem("chatHistory", messages.innerHTML);
 }
 
 function showWelcomeMessage(nickname) {
@@ -44,17 +56,31 @@ function showWelcomeMessage(nickname) {
     messages.appendChild(messageElement);
 }
 
-socket.on("nickname rebut", function (data) {
-    console.log(data);
+function showMessage(text, className) {
+    const messageElement = document.createElement("div");
+    messageElement.classList.add(className || "text-muted");
+    messageElement.innerText = text;
+    messages.appendChild(messageElement);
+    messages.scrollTop = messages.scrollHeight;
+    saveChatHistory();
+}
+
+socket.on("nickname received", function () {
     showWelcomeMessage(nicknameInput.value);
 });
 
-socket.on("time", function (data) {
-    console.log(data);
+socket.on("chat message", function (data) {
+    showMessage(`${data.nickname}: ${data.message}`);
 });
 
-socket.on("chat message", function (data) {
-    const messageElement = document.createElement("div");
-    messageElement.innerText = `${data.nickname}: ${data.message}`;
-    messages.appendChild(messageElement);
-});
+// Cargar historial de chat al iniciar la página
+loadChatHistory();
+
+const clearChatButton = document.getElementById("clearChatButton");
+
+clearChatButton.addEventListener("click", clearChat);
+
+function clearChat() {
+    messages.innerHTML = "";
+    localStorage.removeItem("chatHistory");
+}
